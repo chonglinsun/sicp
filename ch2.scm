@@ -1771,3 +1771,78 @@
 	   "No method for these types -- APPLY-GENERIC"
 	   (list op type tags))))))
 
+;;exercise 2.73
+;;a
+;;number?, same-variable? are predicates. there's nothing to dispatch.
+;;b
+(define (deriv-sum exp var)
+  (make-sum (deriv (addend exp) var)
+	    (deriv (augend exp) var)))
+
+(define (deriv-product exp var)
+  (make-sum (deriv (multiplicand exp) var)
+	    (deriv (multiplier exp) var)))
+
+(define (install-deriv)
+  (put 'deriv '+ deriv-sum)
+  (put 'deriv '* deriv-product)
+  'done)
+;;c
+(define (deriv-exponentiation exp var)
+  (let ((b (base exp))
+	(e (exponent exp)))
+    (make-product e
+		  (make-product (make-exponentiation b (make-sum e -1))
+				(deriv b var)))))
+(define (install-exponentiation-extension)
+  (put 'deriv '** deriv-exponentiation)
+  'done)
+
+;;d
+(define (install-deriv-changes)
+  (put '** 'deriv deriv-exponentiation)
+  (put '+ 'deriv deriv-sum)
+  (put '* 'deriv deriv-product)
+  'done)
+
+;;exercise 2.74
+(define (make-hq-file division file)
+  (cons division file))
+
+(define (file-division hq-file)
+  (car hq-file))
+
+(define (original-file hq-file)
+  (cdr hq-file))
+
+(define (get-record employee hq-file)
+  ((get 'get-record (file-division hq-file))
+   employee (original-file hq-file)))
+
+(define (has-record? employee division)
+  ((get 'has-record? division) employee))
+
+;;b
+(define (make-hq-record division record)
+  (cons division record))
+
+(define (record-division record)
+  (car record))
+
+(define (original-record record)
+  (cdr record))
+
+(define (get-salary record)
+  ((get 'get-salary (record-division record))
+   (original-record record)))
+
+;;c
+(define (find-employee-record employee files)
+  (cond ((null? file) (error "FIND-EMPLOYEE-RECORD : No sunch employee." employee))
+	((has-record? employee (file-division (car files)))
+	 (get-record employee (car files)))
+	(else (find-employee-record employee
+				    (cdr files)))))
+
+
+  
