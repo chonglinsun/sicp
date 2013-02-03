@@ -2021,3 +2021,292 @@
 ;;the complex package
 ;;(define (=zero? z1) (zero? (magnitude z1)))
 ;;(put '=zero? '(complex) =zero?)
+
+;;exercise 2.81
+;;a
+;;loop infinitely
+;;b
+;;works
+;;first test if (eq? type1 type2)
+
+;;2.82
+(define (apply-generic op . args)
+  (define (try-convert x new-type)
+    (let ((converter (get-coercion (type-tag x) new-type)))
+      (if converter
+	  (converter x)
+	  x)))
+  (define (apply-generic-1 op args type-list)
+    (if (null? type-list)
+	(error "No method for there types" 
+	       (list op (map type-tag args)))
+	(let ((new-args (map (lambda (x)
+			       (try-convert x (car type-list)))
+			     args)))
+	  (let ((new-type-tags (map type-tag new-args)))
+	    (let ((proc (get op new-type-tags)))
+	      (if proc
+		  (apply proc (map contents new-args))
+		  (apply-generic-1 op args (cdr type-list))))))))
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+	  (apply proc (map contents args))
+	  (apply-generic-1 op args type-tags)))))
+
+;;type1->type3 type2->type, this kind of situation is not considered
+
+;;erercise 2.83
+;;(define (raise x) (apply-generic 'raise x))
+
+;;in the integer package
+;;(put 'raise '(integer) (lambda (n) (make-rational n 1)))
+
+;;in the rational package
+;;(define (rational-real r) (make-real (/ (numer r) (denom r))))
+;;(put 'raise '(rational) rational->real)
+
+;;in the real package
+;;(define (real->complex r) (make-complex-from-real-imag r 0))
+;;(put 'raise '(real) real->complex)
+
+;;exercise 2.84
+(define (tower-level x)
+  (let ((typex (type-tag x)))
+    (cond ((eq? typex 'rational) 1)
+	  ((eq? typex 'complex) 3)
+	  (else
+	   (let ((y (contents x)))
+	     (if (exact-integet? y)
+		 0
+		 2))))))
+
+(define (raise-to level x)
+  (if (= level (tower-level x))
+	x
+	(raise-to level (raise x))))
+
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+	  (apply proc (map contents args))
+	  (if (= (length args 2))
+	      (let ((a1 (car args))
+		    (a2 (cadr args))
+		    (level1 (tower-level a1))
+		    (level2 (tower-level a2)))
+		(cond ((< level1 level2)
+		       (apply-generic op (raise-to level2 a1) a2))
+		      ((< level2 level1)
+		       (apply-generic op a1 (raise-to level1 a2)))
+		      (else
+		       (error "No method for these types"
+			      (list op type-tags)))))
+	      (error "No method for these types"
+		     (list op type-tags)))))))
+
+;;exercise 2.85
+;;(define (complex->real x)
+;;  (make-real (real->part x) 1))
+;;(put 'project '(complex) complex->real)
+
+;;(define (real->rational x)
+;;  (make-rational _numer x) (denom x))
+;;(put 'project '(real) 'real->rational)
+
+;;(define (ration->integer x)
+;;  (make-integet (round (/ (numer x) (denom x)))))
+;;(put 'project '(rational) rational->integet)
+
+;;(define (project x)
+;;  (apply-generic 'project x))
+
+;;(define (can-be-lowered? x)
+;;  (equ? x
+;;	(raise (project x))))
+
+;;(define (drop x)
+;;  (define (iter x)
+;;    (if (or (eq? (type-tag x) 'integer)
+;;	    (not (can-be-lowered? x)))
+;;	x
+;;	(iter (project x))))
+;;  (iter x))
+
+;;exercise 2.86
+
+;;content
+(define (add-poly p1 p2)
+  (if (same-variable? (variable p1) (variable p2))
+      (make-poly (variable p1)
+		 (add-terms (term-list p1)
+			    (term-list p2)))
+      (error "Polys not in same var -- ADD-POLY"
+	     (list p1 p2))))
+
+(define (mul-poly p1 p2)
+  (if (same-variable? (variable p1) (variable p2))
+      (make-poly (variable p1)
+		 (mul-terms (term-list p1)
+			    (term-list p2)))
+      (error "Polys not in same var -- MUL-POLY"
+	     (list p1 p2))))
+(define (install-polynomial-package)
+  ;;internal procedures
+  ;;representation of poly
+  (define (make-poly variable term-list)
+    (cons variable term-list))
+  (define (variable p) (car p))
+  (define (term-list p) (cdr p))
+  (define (variable? x) (symbol? x))
+  (define (same-variable? v1 v2)
+    (and (variable? v1) (variable? v2) (eq? v1 v2)))
+  
+  (define (tag p) (attach-tag 'polynomial p))
+  (put 'add '(polynomial polynomial)
+       (lambda (p1 p2) (tag (add-poly p1 p2))))
+  (put 'mul '(polynomial polynomial)
+       (lambda (p1 p2) (tag (mul-poly p1 p2))))
+  (put 'make 'polynomial
+       (lambda (var terms) (tag (make-poly var terms))))
+  'done)
+
+(define (add-terms L1 L2)
+  (cond ((empty-termlist? L1) L2)
+	((empty-termlist? L2) L1)
+	(else
+	 (let ((t1 (first-term L1)) (t2 (first-term L2)))
+	   (cond ((> (order t1) (order t2))
+		  (adjoin-term
+		   t1 (add-terms (rest-terms L1) L2)))
+		 ((< (order t1) (order t2))
+		  (adjoin-term
+		   t2 (add-terms L1 (rest-terms L2))))
+		 (else 
+		  (adjion-term 
+		   (make-term (order t1)
+			      (add (coeff t1) (coeff t2)))
+		   (add-terms (rest-terms L1)
+			      (rest-terms L2)))))))))
+
+
+(define (mul-terms L1 L2)
+  (if (empty-termlist? L1)
+      (the-empty-termlist)
+      (add-terms (mul-term-by-all-terms (first-term L1) L2)
+		 (mul-terms (rest-terms L1) L2))))
+
+(define (mul-term-by-all-terms t1 L)
+  (if (empty-termlist? L)
+      (the-empty-termlist)
+      (let ((t2 (first-term L)))
+	(adjoin-term
+	 (make-term (+ (order t1) (order t2))
+		    (mul (coeff t1) (coeff t2)))
+	 (mul-term-by-all-terms t1 (rest-terms L))))))
+
+(define (adjoin-term term term-list)
+  (if (=zero? (coeff term))
+      term-list
+      (cons term term-list)))
+
+(define (the-empty-termlist) '())
+(define (first-term term-list) (car term-list))
+(define (rest-terms term-list) (cdr term-list))
+(define (empty-termlist? term-list) (null? term-list))
+(define (make-term order coeff) (list order coeff))
+(define (order term) (car term))
+(define (coeff term) (cadr term))
+
+;;exercise 2.87
+(define (zero-poly? poly)
+  (define (zero-terms? term-list)
+    (or (empty-termlist? term-list)
+	(and (=zero? (coeff (first-term term-list)))
+	     (zero-terms? (rest-term term-list)))))
+  (zero-terms? (term-list poly)))
+
+;;exercise 2.88
+;(define (negate x) (apply-generic 'negate x))
+;;add into scheme-numer package
+;(put 'negere 'scheme-number
+;     (lambda (n) (tag (-n))))
+
+;;add into rational package
+;(put 'negate 'rational 
+;     (lambda (rat) (make-rational (- (number rate)) 
+;				  (denom rat))))
+
+;;add into polynomial package
+;(define (negate-terms term-list)
+;  (if (empty-termlist? term-list)
+;      the-empty-termlist
+;      (let ((t (first-term termlist)))
+;	(adjoin-term (make-term (order t) (negate (coeff t)))
+;		     (negate-terms (rest-terms term-list))))))
+
+;(put 'negate 'polynomial
+;     (lambda (poly) (make-polynomial (variable poly)
+;				     (negate-terms (term-list poly)))))
+
+;(put 'sub '(polynomial polynomial)
+;     (lambda (x y)
+;       (tag (add-poly x (negate y)))))
+
+
+;;exercise 2.89
+;(define (first-term term-list)
+;  (list (car term-list) (- (length term-list) 1)))
+
+;(define (adjoin-term term term-list)
+;  (let ((exponent (order term))
+;	(len (length term-list)))
+;    (define (iter-adjoin times terms)
+;      (cond ((=zero? (coeff term)
+;		    terms))
+;	    ((= exponent times)
+;	     (cons (coeff term) terms))
+;	    (else (iter-adjoin (+ times 1)
+;			       (cons 0 terms)))))
+;    (iter-adjoin len term-list)))
+
+
+;;exercise 2.90 to do
+
+;;exercise 2.91
+(define (div-terms L1 L2)
+  (newline)
+  (display a)
+  (if (empty-termlist? L1)
+      (list (the-empty-termlist) (the-empty-termlist))
+      (let ((t1 (first-term L1))
+	    (t2 (first-term L2)))
+	(if (> (order t2) (order t1))
+	    (list (the-empty-termlist) L1)
+	    (let ((cc (/ (coeff t1) (coeff t2)))
+		  (noo (- (order t1) (order t2))))
+		(let ((rest-of-result (div-terms
+				       (add-terms
+					L1
+					(mul-term-by-all-terms (make-term
+								noo
+								(- 0 cc))
+							       L2))
+				       L2)))
+		  (list (adjoin-term (make-term noo cc)
+				     (car rest-of-result))
+			(cadr rest-of-result))))))))
+			
+;;exercise 2.92 TODO
+
+;;exercise 2.93 TODO
+
+;;exercise 2.94 TODO
+
+;;exercise 2.95 TODO
+
+;;exercise 2.96 TODO
+
+;;exercise 2.97 TODO
+
