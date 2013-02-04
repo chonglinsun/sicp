@@ -315,3 +315,116 @@
 (display v)
 
 ;;exercise 3.15
+
+;;exercise 3.16
+(define (count-pairs x)
+  (if (not (pair? x))
+      0
+      (+ (count-pairs (car x))
+	 (count-pairs (cdr x))
+	 1)))
+(define l31 (list 'a 'b 'c))
+
+(define l41 (list 'b 'c))
+(define l42 (list 'a))
+(set-car! l41 l42)
+(set-car! (cdr l41) l42)
+
+(define l71 (list 'a))
+(define l72 (list 'b))
+(define l73 (list 'c))
+(set-car! l72 l73)
+(set-cdr! l72 l73)
+(set-car! l71 l72)
+(set-cdr! l71 l72)
+
+(newline)
+(display (count-pairs l31))
+(newline)
+(display (count-pairs l41))
+(newline)
+(display (count-pairs l71))
+
+;exercise 3.17
+(define (count-pairs x)
+  (let ((aux '()))
+    (define (count z)
+      (cond ((not (pair? z)) 0)
+	    ((memq z aux) 0)
+	    (else
+	     (if (null? aux)
+		 (set! aux (list z))
+		 (set-cdr! (last-pair aux) (list z)))
+	     (+ (count (car z))
+		(count (cdr z))
+		1))))
+    (count x)))
+
+(newline)
+(display (count-pairs l71))
+
+;;exercise 3.18
+(define (cycle? x)
+  (let ((aux '()))
+    (define (check-cycle y)
+      (cond ((null? y) false)
+	    ((memq (car y) aux) true)
+	    (else
+	     (begin
+	       (if (null? aux)
+		   (set! aux (list (car y)))
+		   (set-cdr! (last-pair aux) (list (car y))))
+	       (check-cycle (cdr y))))))
+    (check-cycle x)))
+
+(newline)
+(display (cycle? l71))
+(define test-cycle (list 'a 'b 'c))
+(set-cdr! (last-pair test-cycle) test-cycle)
+(newline)
+(display (cycle? test-cycle))
+
+;;exercise 3.19
+(define (cycle? y)
+  (define (seen-last-pair? x)
+    (or (null? x) (null? (cdr x))))
+  (define (chase p1 p2)
+    (cond ((or (null? p1) (null? p2)) #f)
+	  ((eq? (car p1) (car p2)) #t)
+	  ((seen-last-pair? p2) #f)
+	  (else
+	   (chase (cdr p1) (cddr p2)))))
+  (if (seen-last-pair? y)
+      #f
+      (chase y (cdr y))))
+
+(newline)
+(display (cycle? test-cycle))
+
+;;content
+(define (my-cons x y)
+  (define (set-x! v) (set! x v))
+  (define (set-y! v) (set! y v))
+  (define (dispatch m)
+    (cond ((eq? m 'car) x)
+	  ((eq? m 'cdr) y)
+	  ((eq? m 'set-car!) set-x!)
+	  ((eq? m 'set-cdr!) set-y!)
+	  (else (error "Undefined operator -- CONS" m))))
+  dispatch)
+
+(define (my-car z) (z 'car))
+(define (my-cdr z) (z 'cdr))
+(define (my-set-car! z new-value)
+  ((z 'set-car!) new-value)
+  z)
+(define (my-set-cdr! z new-value)
+  ((z 'set-cdr!) new-value)
+  z)
+
+;;exercise 3.20
+(define x (my-cons 1 2))
+(define z (my-cons x x))
+(my-set-car! (my-cdr z) 17)
+(newline)
+(display (my-car x))
