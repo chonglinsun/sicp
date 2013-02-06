@@ -656,4 +656,442 @@
 
 (((dq 'delete-front!)) 'print)
 
+;;content
+(define (lookup key table)
+  (let ((record (assoc key (cdr table))))
+    (if record
+	(cdr record)
+	false)))
+
+(define (assoc key records)
+  (cond ((null? records) false)
+	((equal? key (caar records))
+	 (car records))
+	(else (assoc key (cdr records)))))
+
+(define (insert! key value table)
+  (let ((record (assoc key (cdr table))))
+    (if record
+	(set-cdr! record value)
+	(set-cdr! table
+		  (cons (cons key value) 
+			(cdr table)))))
+  'ok)
+
+(define (make-table)
+  (list '*table*))
+
+(define tb (make-table))
+
+(insert! 'a 1 tb)
+(insert! 'b 2 tb)
+(newline)
+(display (lookup 'a tb))
+(newline)
+(display (lookup 'c tb))
+
+
+(define (lookup key-1 key-2 table)
+  (let ((subtable (assoc key-1 (cdr table))))
+    (if subtable
+	(let ((record (assoc key-2 (cdr subtable))))
+	  (if record
+	      (cdr record)
+	      false))
+	false)))
+
+(define (insert! key-1 key-2 value table)
+  (let ((subtable (assoc key-1 (cdr table))))
+    (if subtable
+	(let ((record (assoc key-2 (cdr subtable))))
+	  (if record
+	      (set-cdr! record value)
+	      (set-cdr! subtable
+			(cons (cons key-2 value)
+			      (cdr subtable)))))
+	(set-cdr! table
+		  (cons (list key-1
+			      (cons key-2 value))
+			(cdr table)))))
+  'ok)
+
+(define tb-2 (make-table))
+(insert! 'math '+ 43 tb-2)
+(insert! 'letters 'a 97 tb-2)
+(newline)
+(display (lookup 'math '+ tb-2))
+(newline)
+(display (lookup 'math 'a tb-2))
+
+(define (make-table)
+  (let ((local-table (list '*table*)))
+    (define (lookup key-1 key-2)
+      (let ((subtable (assoc key-1 (cdr local-table))))
+	(if subtable
+	    (let ((record (assoc key-2 (cdr subtable))))
+	      (if record
+		  (cdr record)
+		  false))
+	    false)))
+    (define (insert! key-1 key-2 value)
+      (let ((subtable (assoc key-1 (cdr local-table))))
+	(if subtable
+	    (let ((record (assoc key-2 (cdr subtable))))
+	      (if record
+		  (set-cdr! record value)
+		  (set-cdr! subtable
+			    (cons (cons key-2 value)
+				  (cdr subtable)))))
+	    (set-cdr! local-table
+		      (cons (list key-1
+				  (cons key-2 value))
+			    (cdr local-table)))))
+      'ok)
+
+    (define (dispatch m)
+      (cond ((eq? m 'lookup-proc) lookup)
+	    ((eq? m 'insert-proc!) insert!)
+	    (else
+	     (error "Unknow operation -- TABLE" m))))
+    dispatch))
+
+(define operation-table (make-table))
+(define get (operation-table 'lookup-proc))
+(define put (operation-table 'insert-proc!))
+
+(put 'math '+ 43)
+(put 'letter '+ 97)
+(newline)
+(display (get 'math '+))
+(newline)
+(display (get 'letter 'a))
+
 ;;exercise 3.24
+(define (make-table same-key?)
+  (let ((local-table (list '*table*)))
+    (define (assoc key records)
+      (cond ((null? records) false)
+	    ((same-key? key (caar records))
+	     (car records))
+	    (else
+	     (assoc key (cdr records)))))
+
+    (define (lookup key-1 key-2)
+      (let ((subtable (assoc key-1 (cdr local-table))))
+	(if subtable
+	    (let ((record (assoc key-2 (cdr subtable))))
+	      (if record
+		  (cdr record)
+		  false))
+	    false)))
+
+    (define (insert! key-1 key-2 value)
+      (let ((subtable (assoc key-1 (cdr local-table))))
+	(if subtable
+	    (let ((record (assoc key-2 (cdr subtable))))
+	      (if record
+		  (set-cdr! record value)
+		  (set-cdr! subtable
+			    (cons (cons key-2 value)
+				  (cdr subtable)))))
+	    (set-cdr! local-table
+		      (cons (list key-1
+				  (cons key-2 value))
+			    (cdr local-table)))))
+      'ok)
+    
+    (define (dispatch m)
+      (cond ((eq? m 'lookup) lookup)
+	    ((eq? m 'insert!) insert!)
+	    (else (error "Unknow operator -- TABLE" m))))
+    dispatch))
+
+(define tb-3 (make-table equal?))
+((tb-3 'insert!) 'math '+ 47)
+((tb-3 'insert!) 'letters '+ 97)
+(newline)
+(display ((tb-3 'lookup) 'math '+))
+(newline)
+(display ((tb-3 'lookup) 'letters 'a))
+
+;;exercise 3.25
+(define (make-table)
+  (let ((local-table (list '*table*)))
+    (define (assoc key records)
+      (cond ((null? records) false)
+	    ((equal? key (caar records)) (car records))
+	    (else (assoc key (cdr records)))))
+    (define (lookup key-list)
+      (define (lookup-1 keys table)
+	(let ((subtable (assoc (car keys) (cdr table))))
+	  (if subtable
+	      (if (null? (cdr keys))
+		  (cdr subtable)
+		  (lookup-1 (cdr keys) subtable))
+	      false)))
+      (lookup-1 key-list local-table))
+    
+    (define (insert! key-list value)
+      (define (make-entry keys)
+	(if (null? (cdr keys))
+	    (cons (car keys) value)
+	    (list (car keys)
+		  (make-entry (cdr keys)))))
+      (define (insert-1! keys table)
+	(let ((subtable (assoc (car keys) (cdr table))))
+	  (if subtable
+	      (if (null? (cdr keys))
+		  (set-cdr! subtable value)
+		  (insert-1! (cdr keys) subtable))
+	      (set-cdr! table
+			(cons (make-entry keys)
+			      (cdr table))))))
+      (insert-1! key-list local-table)
+      'ok)
+    (define (print-table)
+      (newline)
+      (display (cdr local-table)))
+
+    (define (dispatch m)
+      (cond ((eq? m 'lookup) lookup)
+	    ((eq? m 'insert!) insert!)
+	    ((eq? m 'print-table) (print-table))
+	    (else
+	     (error "Unknown operator -- TABLE" m))))
+    dispatch))
+
+(define tb-4 (make-table))
+((tb-4 'insert!) '(e f g h) '2)
+((tb-4 'insert!) '(a b c) '1)
+(newline)
+(display ((tb-4 'lookup) '(a b c)))
+(newline)
+(display ((tb-4 'lookup) '(e f g h)))
+
+;;exercise 3.26
+(define (make-table)
+  (define local-table '())
+  (define make-record cons)
+  (define key-record car)
+  (define value-record cdr)
+
+  (define (make-tree entry left right)
+    (list entry left right))
+  (define entry car)
+  (define left-branch cadr)
+  (define right-branch caddr)
+  
+  (define key=? equal?)
+  
+  (define (key<? key1 key2)
+    (cond ((and (string? key1)
+		(string? key2)) (string<? key1 key2))
+	  ((and (number? key1)
+		(number? key2)) (< key1 key2))
+	  ((and (char? key1)
+		(char? key2)) (char<? key1 key2))
+	  (else (error "Unsupported key types --KEY<?" key1 key2))))
+
+  (define (element-of-set? x set)
+    (cond ((null? set) false)
+	  ((key=? (key-record x) (key-record (entry set)))
+	   true)
+	  ((key<? (key-record x) (key-record (entry set)))
+	   (element-of-set? x (left-branch set)))
+	  (else
+	   (element-of-set? x (right-branch set)))))
+
+  (define (adjoin-set x set)
+    (cond ((null? set) (make-tree x '() '()))
+	  ((key=? (key-record x) (key-record (entry set))) set)
+	  ((key<? (key-record x) (key-record (entry set)))
+	   (make-tree (entry set)
+		      (adjoin-set x (left-branch set))
+		      (right-branch set)))
+	  (else
+	   (make-tree (entry set)
+		      (left-branch set)
+		      (adjoin-set x (right-branch set))))))
+  
+  (define (lookup-1 key records)
+    (if (null? records) 
+	false
+	(let ((record (entry records)))
+	  (cond ((key=? key (key-record record)) (value-record record))
+		((key<? key (key-record record))
+		 (lookup-1 key (left-branch records)))
+		(else 
+		 (lookup-1 key (right-branch records)))))))
+  
+  (define (insert! key value)
+    (set! local-table
+	  (adjoin-set (make-record key value)
+		      local-table)))
+
+  (define (lookup key)
+    (lookup-1 key local-table))
+
+  (define (print)
+    (newline)
+    (display local-table))
+
+  (define (dispatch m)
+    (cond ((eq? m 'lookup) lookup)
+	  ((eq? m 'insert!) insert!)
+	  ((eq? m 'print) (print))
+	  (else 
+	   (error "Unknow operation -- TABLE" m))))
+  dispatch)
+
+(define tb-5 (make-table))
+((tb-5 'insert!) 2 'a)
+(tb-5 'print)
+((tb-5 'insert!) 1 'b)
+(tb-5 'print)
+(newline)
+(display ((tb-5 'lookup) 2))
+
+(define tb-6 (make-table))
+((tb-6 'insert!) "hello" 222)
+((tb-6 'insert!) "world" 333)
+(newline)
+(display ((tb-6 'lookup) "hello"))
+(newline)
+(display ((tb-6 'lookup) "hell"))
+
+;;exercise 3.27
+(define (memoize f)
+  (let ((table (make-table)))
+    (lambda (x)
+      (let ((previously-computed-result ((table 'lookup) x)))
+	(or previously-computed-result
+	    (let ((result (f x)))
+	      ((table 'insert!) x result)
+	      result))))))
+(define memo-fib 
+  (memoize (lambda (n)
+	     (cond ((= n 0) 0)
+		   ((= n 1) 1)
+		   (else 
+		    (+ (memo-fib (- n 1))
+		       (memo-fib (- n 2))))))))
+
+(newline)
+(display (memo-fib 3))
+(newline)
+(display (memo-fib 1000))
+
+;;content
+(define (inverter input output)
+  (define (invert-input)
+    (let ((new-value (logical-not (get-signal input))))
+      (after-delay inverter-delay
+		   (lambda()
+		     (set-signal! output new-value)))))
+  (add-action! input invert-input)
+  'ok)
+
+(define (logical-not s)
+  (cond ((= s 0) 1)
+	((= s 1) 0)
+	(else (error "Invalid signal" s))))
+
+(define (and-gate a1 a2 output)
+  (define (and-action-procedure)
+    (let ((new-value
+	   (logical-and (get-signal a1) (get-signal a2))))
+      (after-delay and-gate-delay
+		   (lambda()
+		     (set-signal! output new-value)))))
+  (add-action! a1 and-action-procedure)
+  (add-action! a2 and-action-procedure)
+  'ok)
+
+(define (or-gate a1 a2 output)
+  (define (or-action-procedure)
+    (let ((new-value
+	   (logical-or (get-signal a1) (get-signal a2))))
+      (after-delay or-gate-delay
+		   (lambda()
+		     (set-signal! output new-value)))))
+  (add-action! a1 or-action-procedure)
+  (add-action! a2 or-action-procedure)
+  'ok)
+
+;;exercise 3.29
+(define (or-gate a1 a2 output)
+  (define (or-action-procedure)
+    (let ((not-a1 (make-wire))
+	  (not-a2 (make-wire))
+	  (b (make-wire)))
+      (inverter a1 not-a1)
+      (inverter a2 not-a2)
+      (and-gate not-a1 not-a2 b)
+      (inverter b output)))
+  (add-action! a1 or-action-procedure)
+  (add-action! a2 or-action-procedure)
+  'ok)
+
+;or-gate-delay-time + 2 * inverter-delay-time
+
+;;exercise 3.30
+(define (ripple-carry-adder as bs ss c-out)
+  (define (last-bit? x)
+    (null? (cdr x)))
+  
+  (define (ripple-iter as bs ss ic-in ic-out)
+    (if (null? as)
+	'ok
+	((full-adder (car as)
+		    (car bs)
+		    c-in
+		    (car ss)
+		    (if (last-bit? as) c-out ic-out))
+	(ripple-iter (cdr as) 
+		     (cdr bs)
+		     (cdr ss)
+		     ic-out
+		     (make-wire)))))
+
+  (if (and (= (length as) (length bs))
+	   (= (length bs) (length ss)))
+      (let ((c-in (make-wire))
+	    (sum (make-wire)))
+	(ripple-iter as bs ss c-in sum))
+      (error "Input must be the same length -- RIPPLE-CARRY-ADDER!" 
+	     (length as) (length bs) (length cs))))
+
+;;content
+(define (make-wire)
+  (let ((signal-value 0) (action-procedures '()))
+    (define (set-my-signal! new-value)
+      (if (not (= signal-value new-value))
+	  (begin (set! signal-value new-value)
+		 (call-each action-procedures))
+	  'done))
+    (define (accept-action-procedure! proc)
+      (set! action-procedures! (cons proc action-procedures))
+      (proc))
+    (define (dispatch m)
+      (cond ((eq? m 'get-signal) signal-value)
+	    ((eq? m 'set-signal!) set-my-signal!)
+	    ((eq? m 'add-action!) accept-action-procedure!)
+	    (else (error "Unknown operator -- MAKE-WIRE" m))))
+    dispatch))
+
+(define (call-each procedures)
+  (if (null? procedures)
+      'done
+      (begin
+	((car procedures))
+	(call-each (cdr procedures)))))
+
+(define (get-signal wire) 
+  (wire 'get-signal))
+
+(define (set-signal! wire new-value)
+  ((wire 'set-signal!) new-value))
+
+(define (add-action! wire action-procedures)
+  ((wire 'add-action!) action-procedure))
+
