@@ -1364,3 +1364,110 @@
 (set-value! C 25 'user)
 (forget-value! C 'user)
 (set-value! F 212 'user)
+
+;;exercise 3.33
+
+(define (averager a b c)
+  (let ((u (make-connector))
+	(v (make-connector)))
+    (multiplier c v u)
+    (adder a b u)
+    (constant 2 v)
+    'ok))
+
+(define A (make-connector))
+(define B (make-connector))
+(define C (make-connector))
+(averager A B C)
+(probe "A-temp" A)
+(probe "B-temp" B)
+(probe "C-temp" C)
+(set-value! A 100 'user)
+(set-value! C 200 'user)
+
+;;exercise 3.34
+;the value of a would not be set be knowing the value of b
+
+;;exercise 3.35
+(define (squarer a b)
+  (define (process-new-value)
+    (if (has-value? b)
+	(if (< (get-value b) 0)
+	    (error "square less than 0 -- SQUARE" (get-value b))
+	    (set-value! a 
+			(sqrt (get-value b)) 
+			me))
+	(if (has-value? a)
+	    (set-value! b
+			(square (get-value a))
+			me))))
+	
+	
+  (define (process-forget-value)
+    (forget-value! a me)
+    (forget-value! b me)
+    (process-new-value))
+  (define (me request)
+    (cond ((eq? request 'I-have-a-value)
+	   (process-new-value))
+	  ((eq? request 'I-lost-my-value)
+	   (process-forget-value))
+	  (else 
+	   (error "Unknown request -- SQUARER" request))))
+
+  (connect a me)
+  (connect b me)
+  me)
+
+(define A (make-connector))
+(define B (make-connector))
+(squarer A B)
+(probe "A-temp" A)
+(probe "B-temp" B)
+(set-value! B 225 'user)
+
+;;exercise 3.36
+
+;;exercise 3.37
+(define (celsius-fahrenheit-converter x)
+  (c+ (c* (c/ (cv 9) (cv 5))
+	      x)
+	  (cv 32)))
+
+(define (c+ x y)
+  (let ((z (make-connector)))
+    (adder x y z)
+    z))
+
+(define (c* x y)
+  (let ((z (make-connector)))
+    (multiplier x y z)
+    z))
+
+(define (c- x y)
+  (let ((z (make-connector)))
+    (add z y x)
+    z))
+
+(define (c/ x y)
+  (let ((z (make-connector)))
+    (multiplier z y x)
+    z))
+
+(define (cv x)
+  (let ((z (make-connector)))
+    (constant x z)
+    z))
+
+(define C (make-connector))
+(define F (celsius-fahrenheit-converter C))
+
+(probe "C-temp" C)
+(probe "F-temp" F)
+
+(set-value! F 212 'user)
+
+;;exercise 3.38
+;a: 45/35/40/50
+;b: 110/90/80/60/55/30
+
