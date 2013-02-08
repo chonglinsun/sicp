@@ -1471,3 +1471,230 @@
 ;a: 45/35/40/50
 ;b: 110/90/80/60/55/30
 
+;;exercise 3.39
+;121/101/100
+
+;;exercise 3.40
+;1000000/100000/10000/1000/100
+;1000000
+
+;;exercise 3.41
+;unnecessary
+
+;;exercise 3.42
+;In my opinion, it's safe, there is no difference between these two versions
+
+;;exercise 3.43
+
+;;exercise 3.44
+;Louis is not right. The two problems are different.The exchange problem
+;involves the two accounts and makes the two accounts dependent on each other
+;while in the transfer problem, the acount being deposited does not care
+;where the amount being deposited is comming from.
+
+;;exercise 3.45
+;in exchanging two accounts, the same serializer would be used twice
+;One in the serialized-exchange function and the other in the dispatch
+;function. The same mutex be acquared twice would produce a busy 
+;waiting that would never halt.
+
+(define (make-serializer)
+  (let ((mutex (make-mutex)))
+    (lambda (p)
+      (define (serialized-p . args)
+	(mutex 'acquire)
+	(let ((val (apply p args)))
+	  (mutex 'release)
+	  val))
+      serialized-p)))
+
+(define (make-mutex)
+  (let ((cell (list false)))
+    (define (the-mutex m)
+      (cond ((eq? m 'acquire)
+	     (if (test-and-set! cell)
+		 (the-mutex 'acquire)))
+	    ((eq? m 'release) (clear! cell))))
+    the-mutex))
+
+(define (clear! cell)
+  (set-car! cell false))
+
+(define (test-and-set! cell)
+  (if (car cell)
+      true
+      (begin (set-car! cell true)
+	     false)))
+
+;;exercise 3.46
+
+;;exercise 3.47
+;a
+(define (make-sempahore n)
+  (let ((count n)
+	(the-mutex (make-mutex)))
+    (define (the-sempahore m)
+      (cond ((eq? m 'acquire)
+	     (the-mutex 'acquire)
+	     (if (zero? count)
+		 (begin 
+		   (the-mutex 'release)
+		   (the-sempahore 'acquire))
+		 (begin 
+		   (set! count (- count 1))
+		   (the-mutex 'release))))
+	    ((eq? m 'release)
+	     (the-mutex 'acquire)
+	     (if (= count n)
+		 (the-mutex 'release)
+		 (begin
+		   (set! count (+ count 1))
+		   (the-mutex 'release))))))
+    the-sempahore))
+;b
+(define (make-sempahore n)
+  (let ((count n)
+	(cell (list false)))
+    (define (the-sempahore m)
+      (cond ((eq? m 'acquire)
+	     (if (test-and-set! cell)
+		 (the-sempahore 'acquire)
+		 (if (zero? count)
+		     (clear! cell)
+		     (begin (set! count (-count 1))
+			    (clear! cell)))))
+	    ((eq? m 'release)
+	     (if (tst-and-set! cell)
+		 (the-sempahore 'release)
+		 (if (= count n)
+		     (clear! cell)
+		     (begin (set! count (+ count 1))
+			    (clear! cell)))))))
+    the-sempahore))
+
+;;exercise 3.48
+(define (make-account-and-serializer balance id)
+  (define (withdraw amount)
+    (if (>= balance amount)
+	(begin (set! balance (- balance amount))
+	       balance)
+	"Insufficient funds"))
+  (define (deposit amount)
+    (set! balance (+ balance amount))
+    balance)
+  (let ((balance-serializer (make-serializer)))
+    (define (dispatch m)
+      (cond ((eq? m 'withdraw) withdraw)
+	    ((eq? m 'deposit) deposit)
+	    ((eq? m 'balance) balance)
+	    ((eq? m 'id) id)
+	    ((eq? m 'serializer) balance-serializer)
+	    (else (error "Unknown request -- MAKE-ACCOUNT"
+			 m))))
+    dispatch))
+
+(define (serialize-exchange account1 account2)
+  (let ((serializer1 (account1 'serializer))
+	(serializer2 (account2 'serializer))
+	(id1 (account1 'id))
+	(id2 (account2 'id)))
+    (if (< id1 id2)
+	((serializer2 (serializer1 exchange))
+	 account1
+	 account2)
+	((serializer1 (serializer2 exchange))
+	 account1
+	 account2))))
+
+;;exercise 3.49
+;a process must get access to some shared resources before it can know
+;which additional shared resources it will require
+
+;;content
+(define (stream-ref s n)
+  (if (= n 0)
+      (stream-car s)
+      (stream-ref (stream-cdr s) (- n 1))))
+
+;(define (stream-map proc s)
+;  (if (stream-null? s)
+;      the-empty-stream
+;      (cons-stream (proc (stream-car s))
+;		   (stream-map proc (stream-cdr s)))))
+
+(define (stream-for-each proc s)
+  (if (stream-null? s)
+      'done
+      (begin (proc (stream-car s))
+	     (stream-for-each proc (stream-cdr s)))))
+
+(define (display-stream s)
+  (stream-for-each display-line s))
+
+(define (display-line x)
+  (newline)
+  (display x))
+
+(define (cons-stream a b)
+  (cons a (delay b)))
+
+(define (stream-car stream) (car stream))
+
+(define (stream-cdr stream) (force (cdr stream)))
+
+(define (delay exp)
+  (lambda () exp))
+
+(define the-empty-stream  (stream))
+(newline)
+(display "the-empty-stream: ")
+(display the-empty-stream)
+(define (stream-enumerate-interval low high)
+  (if (> low high)
+      the-empty-stream
+      (cons-stream
+       low
+       (stream-enumerate-interval (+ low 1) high))))
+
+(define (stream-filter pred stream)
+  (cond ((stream-null? stream) the-empty-stream)
+	((pred (stream-car stream))
+	 (cons-stream (stream-car stream)
+		      (stream-filter pred
+				     (stream-cdr stream))))
+	 (else (stream-filter pred (stream-cdr stream)))))
+
+(define (force delayed-object)
+  (delayed-object))
+
+(define (memo-proc proc)
+  (let ((already-run? false) (result false))
+    (lambda()
+      (if (not already-run?)
+	  (begin (set! result (proc))
+		 (set! already-run? true)
+		 result)
+	  result))))
+
+;;exercise 3.50
+(define (stream-map proc . argstreams)
+  (if (stream-null? (car argstreams))
+      the-empty-stream
+      (cons-stream
+       (apply proc (map stream-car argstreams))
+       (apply stream-map
+	      (cons proc (map stream-cdr argstreams))))))
+
+;;exercise 3.51
+(define (show x)
+  (display-line x)
+  x)
+
+(define ss (cons-stream 1 (show (+ 2 1))))
+(newline)
+(display (stream-cdr ss))
+(define x (stream-map show (stream-enumerate-interval 0 10)))
+(newline)
+(display (stream-ref x 5))
+(newline)
+(display (stream-ref x 7))
