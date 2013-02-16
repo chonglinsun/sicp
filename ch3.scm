@@ -1616,11 +1616,11 @@
       (stream-car s)
       (stream-ref (stream-cdr s) (- n 1))))
 
-;(define (stream-map proc s)
-;  (if (stream-null? s)
-;      the-empty-stream
-;      (cons-stream (proc (stream-car s))
-;		   (stream-map proc (stream-cdr s)))))
+(define (stream-map proc s)
+  (if (stream-null? s)
+      the-empty-stream
+      (cons-stream (proc (stream-car s))
+		   (stream-map proc (stream-cdr s)))))
 
 (define (stream-for-each proc s)
   (if (stream-null? s)
@@ -1635,15 +1635,32 @@
   (newline)
   (display x))
 
-(define (cons-stream a b)
-  (cons a (delay b)))
+;(define-syntax cons-stream
+;  (syntax-rules ()
+;    ((_ A B) (cons A (delay B)))))
+;(define (cons-stream a b)
+;  (display "cons-stream")
+;  (newline)
+;  (cons a (delay b)))
+
+
+(define-syntax delay
+  (syntax-rules ()
+    ((delay expr)
+     (lambda ()
+       expr))))
+
+(define-syntax con-stream
+  (syntax-rules ()
+    ((cons-stream a b)
+     (cons a (delay b)))))
 
 (define (stream-car stream) (car stream))
 
 (define (stream-cdr stream) (force (cdr stream)))
 
-(define (delay exp)
-  (lambda () exp))
+;(define (delay exp)
+;  (lambda () exp))
 
 (define the-empty-stream  (stream))
 (newline)
@@ -1678,6 +1695,7 @@
 
 ;;exercise 3.50
 (define (stream-map proc . argstreams)
+  (newline)
   (if (stream-null? (car argstreams))
       the-empty-stream
       (cons-stream
@@ -1685,7 +1703,7 @@
        (apply stream-map
 	      (cons proc (map stream-cdr argstreams))))))
 
-;;exercise 3.51
+;exercise 3.51
 (define (show x)
   (display-line x)
   x)
@@ -1698,3 +1716,99 @@
 (display (stream-ref x 5))
 (newline)
 (display (stream-ref x 7))
+
+;;exercise 3.52
+(define (stream-map proc s)
+  (if (stream-null? s)
+      the-empty-stream
+      (cons-stream (proc (stream-car s))
+		   (stream-map proc (stream-cdr s)))))
+(define (memo-proc proc)
+  (let ((already-run? false) (result false))
+    (lambda ()
+      (if (not already-run?)
+	  (begin (set! result (proc))
+		 (set! already-run? true)
+		 result)
+	  result))))
+
+;(define (delay exp)
+;  (memo-proc (lambda () exp)))
+
+(define sum 0)
+(define (accum x)
+  (set! sum (+ x sum))
+  sum)
+(define seq (stream-map accum (stream-enumerate-interval 1 20)))
+(define y (stream-filter even? seq))
+(define z (stream-filter (lambda (x) (= (remainder x 5) 0))
+			 seq))
+(newline)
+(display "exercise 3.52")
+(newline)
+(display "interval 1 20")
+(newline)
+(display-stream (stream-enumerate-interval 1 20))
+(newline)
+(display "seq:")
+(newline)
+(display-stream seq)
+(display "y:")
+(newline)
+(display-stream y)
+(display (stream-ref y 7))
+(display "z:")
+(newline)
+(display-stream z)
+
+;;content
+(newline)
+(define (integers-starting-from n)
+  (cons-stream n (integers-starting-from (+ n 1))))
+
+(define integers (integers-starting-from 1))
+
+(define (divisible? x y) (= (remainder x y) 0))
+
+(define no-sevens
+  (stream-filter (lambda (x) (not (divisible? x 7)))
+		 integers))
+
+(display (stream-ref no-sevens 100))
+
+(define (fibgen a b)
+  (cons-stream a (fibgen b (+ a b))))
+
+(define fibs (fibgen 0 1))
+
+(define (sieve stream)
+  (cons-stream
+   (stream-car stream)
+   (sieve (stream-filter
+	   (lambda (x)
+	     (not (divisible? x (stream-car stream))))
+	   (stream-cdr stream)))))
+
+(define primes (sieve (integers-starting-from 2)))
+
+(newline)
+(display (stream-ref primes 50))
+
+(define ones (cons-stream 1 ones))
+
+(define (add-streams s1 s2)
+  (stream-map + s1 s2))
+
+(define integers (cons-stream 1 (add-streams ones integers)))
+
+;;exercise 3.53
+(define s (cons-stream 1 (add-streams s s)))
+;2^n
+
+;;exercise 3.54
+(define (mul-streams s1 s2)
+  (stream-map * s1 s2))
+
+(define factorials
+  (cons-stream 1
+	       (mul-stream factorials integers)))
