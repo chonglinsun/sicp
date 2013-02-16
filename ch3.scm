@@ -1979,3 +1979,99 @@
 
 ;;exercise 3.66
 ;197 2^99+2^98-2 2^100-2
+
+;;exercise 3.67
+(define (interleave s1 s2)
+  (if (stream-null? s1)
+      s2
+      (cons-stream (stream-car s1)
+		   (interleave s2 (stream-cdr s1)))))
+
+(define (pairs s t)
+  (cons-stream
+   (list (stream-car s) (stream-car t))
+   (interleave
+    (stream-map (lambda (x) 
+		  (list (stream-car s) x))
+		(stream-cdr t))
+    (interleave
+     (stream-map (lambda (x)
+		   (list x (stream-car t)))
+		   (stream-cdr s))
+     (pairs (stream-cdr s) (stream-cdr t))))))
+
+;;exercise 3.68
+;infinite loop
+
+;;exercise 3.69
+(define (triples s t u)
+  (cons-stream
+   (list (stream-car s)
+	 (stream-car t)
+	 (stream-car u))
+   (interleave
+    (stream-map
+     (lambda(x) (append (list (stream-car s)) x))
+     (stream-cdr (pairs t u)))
+    (triples (stream-cdr s)
+	     (stream-cdr t)
+	     (stream-cdr u)))))
+
+;(define pythagorean-triples
+;  (stream-filter (lambda (t)
+;		   (= (+ (square (car t))
+;			 (square (cadr t)))
+;		      (square (caddr t))))
+;		 (triples integers integers integers)))
+
+;;exercise 3.70
+(define (merge-weighted s1 s2 weight)
+  (cond ((stream-null? s1) s2)
+	((stream-null? s2) s1)
+	(else
+	 (let ((car1 (stream-car s1))
+	       (car2 (stream-car s2)))
+	   (cond ((< (weight car1) (weight car2))
+		  (cons-stream car1
+			       (merge-weighted (stream-cdr s1)
+					       s2 weight)))
+		 ((> (weight car1) (weight car2))
+		  (cons-stream car2 
+			       (merge-weighted s1
+					       (stream-cdr s2) weight)))
+		 (else
+		  (cons-stream car1
+			       (merge-weighted (stream-cdr s1)
+					       (stream-cdr s2)
+					       weight))))))))
+(define (weighted-pairs s t weight)
+  (cons-stream
+   (list (stream-car s) (stream-car t))
+   (merge-weighted
+    (stream-map (lambda (x) (list (stream-car s) x))
+		(stream-cdr t))
+    (weighted-pairs (stream-cdr s)
+		    (stream-cdr t) weight)
+    weight)))
+
+(weighted-pairs integers integers
+		(lambda (x)
+		  (apply + x)))
+
+(define (weight-2 i j)
+  (+ (* 2 i)
+     (* 3 j)
+     (* 5 i j)))
+
+(define (unfactored? x)
+  (not (or (even? x)
+	   (zero? (remainder x 3))
+	   (zero? (remainder x 5)))))
+
+(define unfactored-integers 
+  (stream-filter unfactored? integers))
+
+(weighted-pairs unfactored-integers
+		unfactored-integers
+		weight-2)
+
