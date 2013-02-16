@@ -1655,9 +1655,9 @@
     ((cons-stream a b)
      (cons a (delay b)))))
 
-(define (stream-car stream) (car stream))
+;(define (stream-car stream) (car stream))
 
-(define (stream-cdr stream) (force (cdr stream)))
+;(define (stream-cdr stream) (force (cdr stream)))
 
 ;(define (delay exp)
 ;  (lambda () exp))
@@ -1811,4 +1811,171 @@
 
 (define factorials
   (cons-stream 1
-	       (mul-stream factorials integers)))
+	       (mul-streams factorials integers)))
+
+;;exercise 3.55
+(define (partial-sums args)
+  (cons-stream (stream-car args)
+	       (add-streams (stream-cdr args)
+			   (partial-sums args))))
+
+;;exercise 3.56
+(define (merge s1 s2)
+  (cond ((stream-null? s1) s2)
+	((stream-null? s2) s1)
+	(else
+	 (let ((s1car (stream-car s1))
+	       (s2car (stream-car s2)))
+	   (cond ((< s1car s2car)
+		  (cons-stream s1car (merge (stream-cdr s1) s2)))
+		 ((> s1car s2car)
+		  (cons-stream s2car (merge s1 (stream-cdr s2))))
+		 (else
+		  (cons-stream s1car 
+			       (merge (stream-cdr s1)
+				      (stream-cdr s2)))))))))
+
+(define (scale-stream stream factor)
+  (stream-map (lambda (x) (* x factor)) stream))
+
+(define S (cons-stream 1 (merge (scale-stream S 2) 
+				(merge (scale-stream S 3)
+				       (scale-stream S 5)))))
+
+;;exercise 3.57
+;O(n - 1) O(x^n) withour mem-proc
+
+;;exercise 3.58
+;give the  result of num * (radix ^ x) (base den)
+
+;;exercise 3.59
+;a
+(define (integrate-series coeffs)
+  (stream-map / coeffs integers))
+
+;b
+(define cosine-series
+  (cons-stream 1 (integrate-series sine-series)))
+
+(define sine-series
+  (cons-stream 0 (scale-stream (integrate-series cosine-series) -1)))
+
+;;exercise 3.60
+(define (mul-series s1 s2)
+  (cons-stream (* (stream-car s1)
+		  (stream-car s2))
+	       (add-streams (scale-stream (stream-cdr s1)
+					  (stream-car s2))
+			    (mul-series s1
+					(stream-cdr s2)))))
+
+;(define cos-square+sin-square
+;  (add-streams (mul-series cosine-series
+;			   cosine-series)
+;	       (mul-series sine-series
+;			   sine-series)))
+
+;(newline)
+;(display (stream-ref 0 cos-square+sin-square))
+
+;;exercise 3.61
+(define (invert-unit-series S)
+  (stream-cons 1
+	       (scale-stream (mul-series (stream-cdr S)
+					 (invert-unit-series S))
+			     -1)))
+
+;;exercise 3.62
+(define (div-series S1 S2)
+  (let ((denom-const (stream-car S2)))
+    (if (zero? denom-const)
+	(error ("Denominator constant term must be non-zero -- DIV-SERIES"))
+	(mul-series S1
+		    (scale-stream
+		     (invert-unit-series
+		      (scale-stream S2 (/ 1 denom-const)))
+		     denom-const)))))
+
+;(define tan-series
+;  (div-series sine-series
+;	      cosine-series))
+
+;(newline)
+;(display (stream-ref factorials 1))
+
+;;content
+(define (average x y)
+  (/ (+ x y) 2))
+
+(define (sqrt-improve guess x)
+  (average guess (/ x guess)))
+
+(define (sqrt-stream x)
+  (define guesses
+    (cons-stream 1.0
+		 (stream-map 
+		  (lambda (guess)
+		    (sqrt-improve guess x))
+		  guesses)))
+  guesses)
+
+;(display-stream (sqrt-stream 2))
+
+(define (pi-summands n)
+  (cons-stream (/ 1.0 n)
+	       (stream-map - (pi-summands (+ n 2)))))
+
+(define pi-stream
+  (scale-stream (partial-sums (pi-summands 1)) 4))
+
+(define (euler-transform s)
+  (let ((s0 (stream-ref s 0))
+	(s1 (stream-ref s 1))
+	(s2 (stream-ref s 2)))
+    (cons-stream (- s2 (/ (square (- s2 s1))
+			  (+ s0 (* -2 s1) s2)))
+		 (euler-transform (stream-cdr s)))))
+
+(define (make-tableau transform s)
+  (cons-stram s
+	      (make-tableau transform
+			    (transform s))))
+
+(define (accelerated-sequence transform s)
+  (stream-map stream-car
+	      (make-tableau transform s)))
+
+;;exercise 3.63
+;This version is of the same efficiency as the version of delay without memo-proc
+
+;;exercise 3.64
+(define (stream-limit s tolerance)
+  (cond ((stream-null? s) '())
+	((stream-null? (stream-cdr s)) (stream-car s))
+	(else
+	 (let ((s0 (stream-car s))
+	       (s1 (stream-car (stream-cdr s))))
+	   (if (< (abs (- s0 s1))
+		  tolerance)
+	       s1
+	       (stream-limit (stream-cdr s)
+			     tolerance))))))
+
+(define (my-sqrt x tolerance)
+  (stream-limit (sqrt-stream x) tolerance))
+
+(newline)
+(display (my-sqrt 2 0.1))
+(newline)
+(display (my-sqrt 2 0.0001))
+
+;;exercise 3.65
+(define (ln-summands n)
+  (cons-stream (/ 1.0 n)
+	       (stream-map - (ln-summands (+ n 1)))))
+
+(define ln-stream
+  (partial-sums (ln-summands 1)))
+
+;;exercise 3.66
+;197 2^99+2^98-2 2^100-2
