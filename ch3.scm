@@ -2075,3 +2075,43 @@
 		unfactored-integers
 		weight-2)
 
+;;exercise 3.71
+(define (ramujan-numbers)
+  (define (weight-cube x)
+    (let ((i (cadr x))
+	  (j (caddr x)))
+      (+ (* i i i) (* j j j))))
+  (define (ramujans all)
+    (let ((current (stream-car all))
+	  (next (stream-car (stream-cdr all)))
+	  (temp (weight-cube current)))
+      ((cond ((= temp (weight-cube next))
+	      (cons-stream (list temp current next)
+			   (ramujans (stream-cdr (stream-cdr all)))))
+	     (else (ramujans (stream-cdr all)))))))
+  
+  (ramujans (weighted-pairs integers
+			    integers
+			    weight-cube)))
+
+;;exercise 3.72
+(define (weight-square x)
+  (let ((i (car x)) (j (cadr x)))
+    (+ (* i i) (* j j))))
+
+(define (triple-squares)
+  (define (iter all)
+    (let ((s1 (stream-car all))
+	  (s2 (stream-cadr all))
+	  (s3 (stream-caddr all))
+	  (w1 (weight-square s1))
+	  (w2 (weight-square s2))
+	  (w3 (weight-square s3)))
+      (cond ((and (= w1 w2) (= w2 w3))
+	     (cons-stream (list w1 s1 s2 s3)
+			  (iter (stream-cdr (stream-cdr (stream-cdr all))))))
+	    (else
+	     (iter (stream-cdr all))))))
+  (iter (weighted-pairs integers
+			integers
+			weight-square)))
