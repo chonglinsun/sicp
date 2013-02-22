@@ -2115,3 +2115,173 @@
   (iter (weighted-pairs integers
 			integers
 			weight-square)))
+
+;;content
+(define (integral integrand initial-value dt)
+  (define int
+    (cons-stream initial-value
+		 (add-stream (scale-stream integrand dt)
+			     int)))
+  int)
+
+;;exercise 3.73
+(define (RC R C dt)
+  (lambda (i vo)
+    (stream-add (scale-stream i R)
+		(integral (scale-stream i (/ 1 C))
+			  v0))))
+
+(define RC1 (RC 5 1 0.5))
+
+;;exercise 3.74
+(define (make-zero-crossings input-stream last-value)
+  (cons-stream
+   (sign-change-detector (stream-car input-stream) last-value)
+   (make-zero-crossings (stream-cdr input-stream) 
+			(stream-car input-stream))))
+
+;(define zero-crossing (make-zero-crossings sense-data 0))
+
+(define (sign-change-detector current precious)
+  (cond ((and (>= current 0)
+	      (< previous 0)) 1)
+	((and (< current 0)
+	      (>= previous 0)) -1)
+	(else 0)))
+
+;(define zero-crossings
+;  (stream-map sign-change-detector sense-data
+;	      (cons-stream 0 sense-data)))
+
+;;exercise 3.75
+(define (make-zero-crossings input-stream last-value last-average)
+  (let ((avpt (/ (+ (stream-car input-stream) last-value) 2)))
+    (cons-stream (sign-change-detector avpt last-average)
+		 (make-zero-crossings (stream-cdr input-stream)
+				      (stream-car input-stream)
+				      avpt))))
+
+;;exercise 3.76
+(define (smooth input-stream)
+  (scale-stream
+   (add-streams input-stream
+	       (cons 0 input-stream))
+   (/ 1 2)))
+
+(define (make-zero-crossings input-stream)
+  (let ((smooth-stream (smooth input-stream)))
+    (stream-map sign-change-detector
+		input-stream
+		smooth-stream)))
+
+;;content
+(define (integral delayed-integrand initial-value dt)
+  (define int 
+    (cons-stream initial-value
+		 (let ((integrand (force delayed-integrand)))
+		   (add-streams (scale-stream integrand dt)
+				int))))
+  int)
+
+(define (solve f y0 dt)
+  (define y (integral (delay dy) y0 dt))
+  (define dy (stream-map f y))
+  y)
+
+(newline)
+;(display (stream-ref (solve (lambda (y) y) 1 0.001) 1000))
+
+;;exercise 3.77
+(define (integral integrand initial-value dt)
+  (cons-stream initial-value
+	       (if (stream-null? integrand)
+		   the-empty-stream
+		   (integral (stream-cdr integrand)
+			     (+ (* dt (stream-car integrand))
+				initial-value)
+			     dt))))
+
+(define (integral delayed-integrand initial-value dt)
+  (cons-stream initial-value
+	       (if (stream-null? delayed-integrand)
+		   the-empty-stream
+		   (let ((integrand (force delayed-integrand)))
+		     (integral (delay (stream-cdr integrand))
+			       (+ (* dt (stream-car integrand))
+				  initial-value)
+			       dt)))))
+
+;;exercise 3.78
+(define (solve-2nd a b dt y0 dy0)
+  (define y (integral (delay dy) y0 dt))
+  (define dy (integral (delay ddy) dy0 dt))
+  (define ddy (add-streams (scale-stream dy a)
+			   (scale-stream y b)))
+  y)
+
+;;exercise 3.79
+(define (solve-2nd f dt y0 dy0)
+  (define y (integral (delay dy) y0 dt))
+  (define dy (integral (delay ddy) y0 dt))
+  (define ddy (stream-map f
+			  dy
+			  y))
+  y)
+
+;;exercise 3.80
+(define (RLC R L C dt)
+  (lambda (vc0 il0)
+    (define vc (intergral (delay dvc) vc0 dt))
+    (define il (intergral (delay dil) il0 dt))
+    (define dvc (scale-stream il (/ -1 C)))
+    (define dil (add-streams (scale-stream il (/ (* -1 R) L))
+			     (scale-stream vc (/ 1 ))))
+    (cons vc il)))
+
+;;exercise 3.81
+(define initial-seed 317)
+(define (rand-update)
+  (random (expt 2 31)))
+(define (random-init seed)
+  (random-seed seed)
+  (random-update))
+
+(define (random-stream seed)
+  (define random-from
+    (cons-stream (random-init seed)
+		 (stream-map (lambda (x) (random-update)) random-from)))
+  random-from)
+
+(define (rand seed requests)
+  (define (rand-iter randoms actions)
+    (if (stream-null? actions)
+	null
+	(let ((request (stream-car actions)))
+	  (cond ((eq? 'generate request)
+		 (cons-stream (stream-car randomms)
+			      (rand-iter (stream-cdr ramdoms)
+					 (stream-cdr actions))))
+		((eq? 'reset request)
+		 (let ((new-randoms (random-stream (random-init seed))))
+		   (cons-stream (stream-car new-ramdoms)
+				(raon-iter (stream-cdr new-ramdoms)
+					   (stream-cdr (stream-cdr actions))))))
+		(else (error "Unknown request -- RAND"))))))
+  (rand-iter (random-stream (random-init seed))
+	     requests))
+
+;;exercise 3.82
+(define (integral-experiment-stream p x1 x2 y1 y2)
+  (stream-cons (cons (random-in-range x1 x2)
+		     (random-in-range y1 y2))
+	       (integral-experiment-stream p x1 x2 y1 y2)))
+
+(define (estimate-integral experiment-stream passed failed)
+  (define (next passed failed)
+    (cons-stream
+     (/ passed (+ passed failed))
+     (estimate-integral (stream-cdr experiment-stream) passed failed)))
+  (let ((tmp (stream-car experiment-stream)))
+    (if (test (car tmp) (cdr tmp))
+	(next (+ passed 1) failed)
+	(next passed (+ failed 1)))))
